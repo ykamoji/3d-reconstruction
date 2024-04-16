@@ -31,7 +31,7 @@ class extend_MipRayMarcher(torch.nn.Module):
         densities_mid = (densities[:, :, :-1] + densities[:, :, 1:]) / 2
         depths_mid = (depths[:, :, :-1] + depths[:, :, 1:]) / 2
 
-        if rendering_options['clamp_mode'] == 'softplus':
+        if rendering_options.clamp_mode == 'softplus':
             densities_mid = F.softplus(densities_mid - 1)  # activation bias of -1 makes things initialize better
         else:
             assert False, "MipRayMarcher only supports `clamp_mode`=`softplus`!"
@@ -50,7 +50,7 @@ class extend_MipRayMarcher(torch.nn.Module):
         weight_total = weights.sum(2)
         composite_depth = torch.sum(weights * depths_mid, -2) / (weight_total + + 0.001)
 
-        if rendering_options.get('white_back', False):
+        if rendering_options.white_back:
             composite_rgb = composite_rgb + 1 - weight_total
 
         composite_rgb = composite_rgb * 2 - 1  # Scale to (-1, 1)
@@ -69,22 +69,22 @@ class ImportanceRenderer_extended(ImportanceRenderer):
         with torch.no_grad():
             self.plane_axes = self.plane_axes.to(planes.device)
 
-            if rendering_options['ray_start'] == rendering_options['ray_end'] == 'auto':
+            if rendering_options.ray_start == rendering_options.ray_end == 'auto':
                 ray_start, ray_end = math_utils.get_ray_limits_box(ray_origins, ray_directions,
-                                                                   box_side_length=rendering_options['box_warp'])
+                                                                   box_side_length=rendering_options.box_warp)
                 is_ray_valid = ray_end > ray_start
                 if torch.any(is_ray_valid).item():
                     ray_start[~is_ray_valid] = ray_start[is_ray_valid].min()
                     ray_end[~is_ray_valid] = ray_start[is_ray_valid].max()
                 depths_coarse = self.sample_stratified(ray_origins, ray_start, ray_end,
-                                                       rendering_options['depth_resolution'],
-                                                       rendering_options['disparity_space_sampling'])
+                                                       rendering_options.depth_resolution,
+                                                       rendering_options.disparity_space_sampling)
             else:
                 # Create stratified depth samples
-                depths_coarse = self.sample_stratified(ray_origins, rendering_options['ray_start'],
-                                                       rendering_options['ray_end'],
-                                                       rendering_options['depth_resolution'],
-                                                       rendering_options['disparity_space_sampling'])
+                depths_coarse = self.sample_stratified(ray_origins, rendering_options.ray_start,
+                                                       rendering_options.ray_end,
+                                                       rendering_options.depth_resolution,
+                                                       rendering_options.disparity_space_sampling)
 
             batch_size, num_rays, samples_per_ray, _ = depths_coarse.shape
 
@@ -101,7 +101,7 @@ class ImportanceRenderer_extended(ImportanceRenderer):
         densities_coarse = densities_coarse.reshape(batch_size, num_rays, samples_per_ray, 1)
 
         # Fine Pass
-        N_importance = rendering_options['depth_resolution_importance']
+        N_importance = rendering_options.depth_resolution_importance
         if N_importance > 0:
             depths_fine = None
             with torch.no_grad():
@@ -203,15 +203,15 @@ class ImportanceRenderer_extended(ImportanceRenderer):
 
             sampled_features = self.sample_from_planes_hie(self.plane_axes, planes_128, planes_64, planes_32,
                                                            sample_coordinates, padding_mode='zeros',
-                                                           box_warp=options['box_warp'])
+                                                           box_warp=options.box_warp)
             sampled_features = sampled_features.mean(1, keepdims=True)
         else:
             sampled_features = sample_from_planes(self.plane_axes, planes, sample_coordinates, padding_mode='zeros',
-                                                  box_warp=options['box_warp'])
+                                                  box_warp=options.box_warp)
             sampled_features = sampled_features.mean(1, keepdims=True)
 
-        coordinates = (2 / options['box_warp']) * sample_coordinates
+        coordinates = (2 / options.box_warp) * sample_coordinates
         out = decoder(sampled_features, sample_directions)
-        if options.get('density_noise', 0) > 0:
+        if options.density_noise > 0:
             out['sigma'] += torch.randn_like(out['sigma']) * options['density_noise']
         return out
