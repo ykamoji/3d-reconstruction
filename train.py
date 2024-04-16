@@ -285,7 +285,7 @@ def train(config):
         monitor='total_loss_step',
         every_n_train_steps=10,
         mode='min',
-        filename='imagnet-{epoch:02d}-{train_acc:.2f}'
+        filename='imagnet-{epoch:02d}-{total_loss_step:.2f}'
     )
 
     trainer = Trainer(max_epochs=config.training.train_num_steps,
