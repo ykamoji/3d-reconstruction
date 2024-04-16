@@ -1,2 +1,15 @@
-# 3d-reconstruction
-Constructing 3D objects from 2D images
+# Generative 3D Reconstruction
+
+### Requirements
+
+```angular2html
+pip3 install -r requirements.txt
+```
+<hr>
+
+To train, run the below command
+
+```bash 
+python3 train.py 
+```
+<hr>

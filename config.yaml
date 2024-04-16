@@ -2,7 +2,7 @@ seed: 420
 unet_feature_dim: 64 # ignored if render is false
 dim: 128
 image_size: 128
-device: mps
+device: cpu
 training:
   learning_rate: 5e-5
   batch_size: 4
