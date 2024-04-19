@@ -1,12 +1,10 @@
-import torch
 import math
 from functools import partial
-from collections import namedtuple
 from torch import nn,  einsum
 import torch.nn.functional as F
 from einops import rearrange, reduce
 from einops.layers.torch import Rearrange
-from utils import *
+from renderer.utils import *
 
 new_silu = False
 pos_channels = 256

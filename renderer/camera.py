@@ -1,6 +1,6 @@
 # https://github.com/snap-research/3dgp
 
-from utils import TensorGroup
+from renderer.utils import TensorGroup
 import torch
 from typing import List, Tuple, Dict, Union, Optional
 import torch.nn.functional as F
