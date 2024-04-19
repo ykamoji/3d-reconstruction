@@ -6,8 +6,8 @@ import numpy as np
 from torch.utils.data import Dataset
 from torchvision import transforms as T
 from PIL import Image
-from camera import compute_cam2world_matrix, sample_rays
-from utils import TensorGroup
+from renderer.camera import compute_cam2world_matrix, sample_rays
+from renderer.utils import TensorGroup
 
 flip = T.RandomHorizontalFlip()
 
