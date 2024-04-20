@@ -6,9 +6,8 @@ device: mps # Use cpu, cuda or mps
 training:
   learning_rate: 5e-5
   batch_size: 4
-  save_and_sample_every: 3
   dataset: Imagenet
-  train_num_steps: 6
+  train_num_steps: 5
   dataset_folder: !ENV ${DATASET_PATH}
 
 rendering:

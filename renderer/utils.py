@@ -61,7 +61,7 @@ def sample_front_circle(camera_params, num_frames):
             num_samples)  # [num_samples * num_frames]
         angles = torch.stack([yaws, pitches, torch.zeros_like(yaws)], axis=1)  # [num_samples * num_frames, 3]
         fov = camera_params.fov.cpu() if trajectory.fov is None else (
-                    torch.ones_like(camera_params.fov.cpu()) * trajectory.fov)  # [num_samples * num_frames]
+                torch.ones_like(camera_params.fov.cpu()) * trajectory.fov)  # [num_samples * num_frames]
 
     camera_samples = TensorGroup(
         angles=angles,
@@ -656,7 +656,7 @@ def get_top_level_function_name(obj: Any) -> str:
 # ------------------------------------------------------------------------------------------
 
 def list_dir_recursively_with_ignore(dir_path: str, ignores: List[str] = None, add_base_to_relative: bool = False) -> \
-List[Tuple[str, str]]:
+        List[Tuple[str, str]]:
     """List all files recursively in a given directory while ignoring given file and directory names.
     Returns list of tuples containing both absolute and relative paths."""
     assert os.path.isdir(dir_path)
@@ -865,3 +865,15 @@ def get_yaml_loader():
     loader.add_constructor('!ENV', constructor_env_variables)
 
     return loader
+
+
+def check_param_in_layer(param, layers):
+    for layer in layers:
+        if layer in param: return True
+    return False
+
+
+def freeze_layers(model, layers):
+    for name, parameter in model.named_parameters():
+        if check_param_in_layer(name, layers):
+            parameter.requires_grad = False
