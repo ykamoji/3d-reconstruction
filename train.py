@@ -1,5 +1,6 @@
 import yaml
 import json
+import torch
 from lightning import Trainer
 from lightning.pytorch.callbacks import ModelCheckpoint
 from renderer.utils import CustomObject, get_yaml_loader
@@ -59,6 +60,7 @@ def train(config):
 
     trainer = Trainer(max_epochs=config.training.train_num_steps,
                       log_every_n_steps=1,
+                      max_steps=2,
                       # precision="16-mixed",
                       default_root_dir=results_folder,
                       callbacks=[checkpoint_callback])
@@ -66,13 +68,14 @@ def train(config):
     ## TODO:: Freeze the encode and parts of decoder of the unet model
     generator3DModel = initialize_model(config, model_unet)
 
+    model = generator3DModel()
     if load_model:
-        # checkpoint = torch.load(f'{config.logging.model_path}', map_location=config.device)
-        # state_dict = {k.partition('module.')[2]: checkpoint['model'][k] for k in checkpoint['model'].keys()}
-        # model_unet.load_state_dict(state_dict)
-        model = generator3DModel.load_from_checkpoint(f'{config.logging.model_path}', map_location=config.device)
-    else:
-        model = generator3DModel()
+        checkpoint = torch.load(f'{config.logging.model_path}', map_location=config.device)
+        if 'pytorch-lightning_version' in checkpoint.keys():
+            state_dict = checkpoint['state_dict']
+        else:
+            state_dict = {'unet_model.' + k.partition('module.')[2]: checkpoint['model'][k] for k in checkpoint['model'].keys()}
+        model.load_state_dict(state_dict)
 
     trainer.fit(model)
 
