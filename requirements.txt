@@ -39,3 +39,5 @@ tqdm==4.66.2
 urllib3==2.1.0
 wcwidth==0.2.13
 Werkzeug==3.0.2
+imageio==2.34.0
+imageio-ffmpeg==0.4.9

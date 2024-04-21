@@ -5,7 +5,7 @@ image_size: 128
 device: mps # Use cpu, cuda or mps
 training:
   learning_rate: 5e-5
-  batch_size: 4
+  batch_size: 8
   dataset: Imagenet
   train_num_steps: 5
   dataset_folder: !ENV ${DATASET_PATH}
@@ -46,3 +46,6 @@ logging:
 
 dataset_params:
   all_classes: True
+
+visualization:
+  image_path: images/
