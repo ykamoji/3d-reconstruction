@@ -3,10 +3,11 @@ unet_feature_dim: 64 # ignored if render is false
 dim: 128
 image_size: 128
 device: mps # Use cpu, cuda or mps
+randomFLip: False
 training:
   learning_rate: 5e-5
-  batch_size: 8
-  dataset: Imagenet
+  batch_size: 1
+  dataset: Custom # Custom Imagenet
   train_num_steps: 5
   dataset_folder: !ENV ${DATASET_PATH}
 

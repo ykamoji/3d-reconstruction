@@ -79,9 +79,63 @@ class Imagenet_Dataset(Dataset):
         return results
 
 
+class Custom_Dataset(Dataset):
+    def __init__(self, folder, image_size,  config=None):
+        super(Imagenet_Dataset).__init__()
+        image_names_jpg = glob.glob(folder + "/*/*.jpg")
+        image_names_png = glob.glob(folder + "/*/*.png")
+        image_names = image_names_jpg + image_names_png
+        self.image_names = [image_orginal for image_orginal in image_names if 'depth' not in image_orginal]
+
+        print('Number of files: ', len(self.image_names) // 2)
+
+        self.transform = T.Compose([
+            T.Resize((image_size, image_size), interpolation=T.InterpolationMode.LANCZOS),
+            np.array,
+            T.ToTensor()
+        ])
+
+        self.config = config
+
+    def __len__(self):
+        return len(self.image_names)
+
+    def get_names(self):
+        return self.image_names
+
+    def __getitem__(self, idx):
+        img_filename = self.image_names[idx]
+
+        depth_filename_png = img_filename.replace('.jpg', '_depth.png')
+        depth_filename_jpg = img_filename.replace('.jpg', '_depth.jpg')
+
+        depth_filename = depth_filename_png if os.path.exists(depth_filename_png) else depth_filename_jpg
+
+        results = {}
+        results['idx'] = idx
+        results['name'] = img_filename.split('/')[-1]
+        image = Image.open(img_filename)
+        results['depth'] = Image.open(depth_filename)
+        results['images'] = self.transform(image)
+        results['depth'] = self.transform(results['depth'])
+
+        if results['depth'].shape[0] > 1:
+            results['depth'] = results['depth'][0].unsqueeze(0)
+
+        results['depth'] = results['depth'] / 65536 * 2.0 + 4
+
+        if self.config.randomFLip and random.random() < 0.5:
+            results['idx'] = idx + len(self.image_names)
+            results['images'] = flip(results['images'])
+            results['depth'] = flip(results['depth'])
+
+        return results
+
 def getDataset(name):
     if name == 'Imagenet':
         return Imagenet_Dataset
+    elif name == 'Custom':
+        return Custom_Dataset
     else:
         return Dataset
 
