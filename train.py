@@ -1,3 +1,4 @@
+import os
 import yaml
 import json
 import torch
@@ -16,8 +17,11 @@ def train(config):
     results_folder = config.logging.save_dir
     render_3d = config.rendering.render
     unet_feature_dim = config.unet_feature_dim
-    save_dir_checkpoints = results_folder + '/checkpoints'
+    save_dir_checkpoints = results_folder + 'checkpoints'
     load_model = config.logging.load_model
+
+    if not os.path.exists(config.logging.intermediate_outputs):
+        os.makedirs(config.logging.intermediate_outputs)
 
     if render_3d:
         if config.rendering.extended_renderer:

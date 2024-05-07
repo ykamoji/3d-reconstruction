@@ -1,6 +1,7 @@
 import torch
 import clip
 import lpips
+import math
 import lightning as L
 import numpy as np
 import torch.nn.functional as F
@@ -12,6 +13,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader
 from dataset import getDataset, get_camera_rays
 from torchvision.transforms import Normalize
+from torchvision import utils
 
 
 def initialize_model(config, unet_model):
@@ -94,9 +96,9 @@ def initialize_model(config, unet_model):
 
             for name, loss in [("rgb", loss_rgb), ("perceptual", loss_perceptual), ("depth", loss_depth),
                                ("clip", loss_clip), ("tv", loss_tv), ("total", loss_total)]:
-                self.log_loss(name + "_loss", loss)
+                self.log_loss(name + "_loss", loss.item())
 
-            return loss_total.to(self.device_override)
+            return loss_total
 
         def process_one(self, input_feat, data_images, data_depth, x_start, batch_size):
             _, _, _, planes_old = self(input_feat, return_3d_features=True, render=False)
@@ -137,7 +139,7 @@ def initialize_model(config, unet_model):
                 multiply_w_perceptual = 0
 
             return pred_imgs, gt_imgs, pred_depth, gt_depth, loss_perceptual, pred_clip, gt_clip, multiply_w_clip, \
-                multiply_w_perceptual, 0, w1
+                multiply_w_perceptual, torch.zeros(1, device=loss_perceptual.device), w1
 
         def process_two(self, input_feat, data_images, data_depth, x_start, batch_size):
             fov_degrees = torch.ones(batch_size, 1).to(self.device_override) * self.config.rendering.camera_config.fov
@@ -198,11 +200,26 @@ def initialize_model(config, unet_model):
             multiply_w_perceptual = w_perceptual
             multiply_w_clip = w_clip
 
+            ## Intermediate outputs for visualization
+            if self.config.training.save_intermediate_images_step > 0:
+                if self.global_step % self.config.training.save_intermediate_images_step in list(range(5)):
+                    output_path = self.config.logging.intermediate_outputs
+                    utils.save_image(data_images, str(output_path + f'/input-{self.global_step}.png'),
+                                     nrow=int(math.sqrt(data_images.shape[0])))
+                    utils.save_image(data_depth, str(output_path + f'/sample-{self.global_step}_depth.png'),
+                                     nrow=int(math.sqrt(data_images.shape[0])), normalize=True)
+
+                    if type(x_novel) != type(None):
+                        utils.save_image(unnorm(x_novel), str(output_path + f'/sample_trans-{self.global_step}.png'),
+                                         nrow=int(math.sqrt(data_images.shape[0])))
+                        utils.save_image(depth_novel, str(output_path + f'/sample_trans-{self.global_step}_depth.png'),
+                                         nrow=int(math.sqrt(data_images.shape[0])), normalize=True)
+
             return pred_imgs, gt_imgs, pred_depth, gt_depth, loss_perceptual, pred_clip, gt_clip, multiply_w_clip, \
                 multiply_w_perceptual, loss_tv, w1
 
         def log_loss(self, name, loss):
-            self.log(f"{name}", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True,
+            self.log(f"{name}", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                      batch_size=self.config.training.batch_size)
 
         def configure_optimizers(self):

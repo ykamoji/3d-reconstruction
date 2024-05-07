@@ -7,9 +7,10 @@ randomFLip: False
 training:
   learning_rate: 5e-5
   batch_size: 1
-  dataset: Custom # Custom Imagenet
+  dataset: Imagenet # Custom or Imagenet
   train_num_steps: 5
   dataset_folder: !ENV ${DATASET_PATH}
+  save_intermediate_images_step: 5
 
 rendering:
   render: True
@@ -42,6 +43,7 @@ rendering:
 
 logging:
   save_dir: results/
+  intermediate_outputs: results/intermediate/
   load_model: True
   model_path: model/checkpoint_generic.pt # or model/checkpoint_lightning.pt
 
