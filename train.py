@@ -55,10 +55,10 @@ def train(config):
         dirpath=save_dir_checkpoints,
         save_on_train_epoch_end=True,
         enable_version_counter=True,
-        save_top_k=1,
+        save_top_k=3,
         verbose=True,
-        monitor='total_loss_step',
-        every_n_train_steps=10,
+        monitor='total_loss',
+        every_n_epochs=1,
         mode='min',
         filename='checkpoint-{epoch:02d}-{total_loss_step:.2f}'
     )

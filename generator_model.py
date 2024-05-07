@@ -62,6 +62,11 @@ def initialize_model(config, unet_model):
         def forward(self, x, **kwargs):
             return self.unet_model(x, **kwargs)
 
+        # def on_fit_start(self):
+        #     self.trainer.fit_loop.epoch_progress.current.processed = 20
+        #     self.trainer.fit_loop.epoch_progress.current.completed = 20
+        #     print("Starting...")
+
         def on_train_start(self):
             self.unet_model.to(device)
 
@@ -202,7 +207,7 @@ def initialize_model(config, unet_model):
 
             ## Intermediate outputs for visualization
             if self.config.training.save_intermediate_images_step > 0:
-                if self.global_step % self.config.training.save_intermediate_images_step in list(range(5)):
+                if self.global_step % self.config.training.save_intermediate_images_step == 0:
                     output_path = self.config.logging.intermediate_outputs
                     utils.save_image(data_images, str(output_path + f'/input-{self.global_step}.png'),
                                      nrow=int(math.sqrt(data_images.shape[0])))
