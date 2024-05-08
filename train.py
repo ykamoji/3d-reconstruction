@@ -60,7 +60,7 @@ def train(config):
         monitor='total_loss',
         every_n_epochs=1,
         mode='min',
-        filename='checkpoint-{epoch:02d}-{total_loss_step:.2f}'
+        filename='checkpoint-{epoch:02d}-{total_loss:.5f}'
     )
 
     trainer = Trainer(max_epochs=config.training.train_num_steps,

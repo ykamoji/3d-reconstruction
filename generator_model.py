@@ -5,6 +5,7 @@ import math
 import lightning as L
 import numpy as np
 import torch.nn.functional as F
+import torch.nn as nn
 from renderer.camera import compute_cam2world_matrix, sample_rays
 from renderer.utils import TensorGroup
 from random import random
@@ -47,6 +48,22 @@ def initialize_model(config, unet_model):
         loss = (h_variance + w_variance)
         return loss
 
+    def loss_prepare(loss_type, loss_fn, imgs_1, imgs_2):
+
+        if loss_type == 'l1' or loss_type == 'l2':
+            return loss_fn(imgs_1, imgs_2)
+
+        if loss_type == 'cos':
+            ones = torch.ones(size=(imgs_1.shape[0],))
+            if imgs_1.dim() < 2:
+                imgs_1 = imgs_1.unsqueeze(1)
+            if imgs_2.dim() < 2:
+                imgs_2 = imgs_2.unsqueeze(1)
+
+            return loss_fn(input1=torch.flatten(imgs_1, start_dim=1, end_dim=-1),
+                           input2=torch.flatten(imgs_2, start_dim=1, end_dim=-1),
+                           target=ones.to(imgs_1.device))
+
     def unnorm(t):
         return (t + 1) * 0.5
 
@@ -57,7 +74,13 @@ def initialize_model(config, unet_model):
             self.device_override = device
             self.unet_model = unet_model
             self.config = config
-            self.loss_fn = F.l1_loss
+            self.loss_type = self.config.training.loss_type
+            if self.loss_type == 'l1':
+                self.loss_fn = F.l1_loss
+            elif self.loss_type == 'l2':
+                self.loss_fn = nn.MSELoss()
+            elif self.loss_type == 'cos':
+                self.loss_fn = nn.CosineEmbeddingLoss()
 
         def forward(self, x, **kwargs):
             return self.unet_model(x, **kwargs)
@@ -91,9 +114,9 @@ def initialize_model(config, unet_model):
                 multiply_w_perceptual, loss_tv, w1 = Process(input_feat, data_images, data_depth, x_start, batch_size)
 
             loss_perceptual = loss_perceptual.mean()
-            loss_rgb = self.loss_fn(pred_imgs, gt_imgs).mean()
-            loss_depth = self.loss_fn(pred_depth, gt_depth, reduction='mean')
-            loss_clip = self.loss_fn(pred_clip, gt_clip, reduction='mean')
+            loss_rgb = loss_prepare(self.loss_type, self.loss_fn, pred_imgs, gt_imgs)
+            loss_depth = loss_prepare(self.loss_type, self.loss_fn, pred_depth, gt_depth)
+            loss_clip = loss_prepare(self.loss_type, self.loss_fn, pred_clip, gt_clip)
             loss_weight = (1 - w1).mean()
             multiply_weight = linear_low2high(self.global_step, 0, 1, 0, self.config.training.train_num_steps // 2)
 

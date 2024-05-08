@@ -2,7 +2,7 @@ seed: 420
 unet_feature_dim: 64 # ignored if render is false
 dim: 128
 image_size: 128
-device: mps # Use cpu, cuda or mps
+device: cpu # Use cpu, cuda or mps
 randomFLip: False
 training:
   learning_rate: 5e-5
@@ -10,7 +10,8 @@ training:
   dataset: Imagenet # Custom or Imagenet
   train_num_steps: 5
   dataset_folder: !ENV ${DATASET_PATH}
-  save_intermediate_images_step: 5
+  save_intermediate_images_step: 50
+  loss_type: l2 # l1 or l2 or cos
 
 rendering:
   render: True
