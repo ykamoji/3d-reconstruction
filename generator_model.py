@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 from renderer.camera import compute_cam2world_matrix, sample_rays
 from renderer.utils import TensorGroup
+from generate_output import create_3d_output
 from random import random
 from torch.optim import Adam
 from torch.optim.lr_scheduler import OneCycleLR
@@ -91,10 +92,13 @@ def initialize_model(config, unet_model):
         #     print("Starting...")
 
         def on_train_start(self):
-            self.unet_model.to(device)
+            self.unet_model.to(device).train()
 
-        def on_test_model_eval(self):
-            self.unet_model.to(device)
+        def on_train_epoch_start(self):
+            self.unet_model.train()
+
+        def on_validation_model_eval(self):
+            self.unet_model.eval()
 
         def training_step(self, data, batch_idx):
             data_images = data['images'].to(self.device_override)
@@ -264,5 +268,25 @@ def initialize_model(config, unet_model):
             dataloader = DataLoader(dataset, batch_size=self.config.training.batch_size, shuffle=True, drop_last=True,
                                     num_workers=8, persistent_workers=True)
             return dataloader
+
+        def validation_step(self, data, batch_idx):
+            with torch.no_grad():
+                data_images = data['images'].to(self.device_override)
+                data_depth = data['depth'].to(self.device_override)
+                x_start = (2 * data_images - 1)
+                depth_start = data_depth
+                input_feat = torch.cat([x_start, depth_start], dim=1)
+                _, _, _, planes = self(input_feat, return_3d_features=True, render=False)
+                create_3d_output(self, planes, output_path=config.logging.intermediate_outputs,
+                                 filename=str(self.global_step)+'-'+str(batch_idx))
+
+        def val_dataloader(self):
+            datasetClass = getDataset(self.config.training.dataset)
+            dataset = datasetClass(self.config.training.evaluate_folder, image_size=self.config.image_size,
+                                   config=self.config)
+            dataloader = DataLoader(dataset, batch_size=self.config.training.batch_size, drop_last=True,
+                                    num_workers=8, persistent_workers=True)
+            return dataloader
+
 
     return Generator3D

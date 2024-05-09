@@ -65,6 +65,7 @@ def train(config):
 
     trainer = Trainer(max_epochs=config.training.train_num_steps,
                       log_every_n_steps=1,
+                      val_check_interval=0.25,
                       # max_steps=2,
                       # precision="16-mixed",
                       default_root_dir=results_folder,

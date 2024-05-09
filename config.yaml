@@ -11,7 +11,8 @@ training:
   train_num_steps: 5
   dataset_folder: !ENV ${DATASET_PATH}
   save_intermediate_images_step: 50
-  loss_type: l2 # l1 or l2 or cos
+  loss_type: l1 # l1 or l2 or cos
+  evaluate_folder: eval
 
 rendering:
   render: True
