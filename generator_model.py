@@ -16,6 +16,10 @@ from torch.utils.data import DataLoader
 from dataset import getDataset, get_camera_rays
 from torchvision.transforms import Normalize
 from torchvision import utils
+from metrics import FrechetInceptionDistanceModified, compute_flatness_score
+from torchmetrics.image.inception import InceptionScore
+
+_ = torch.manual_seed(123)
 
 
 def initialize_model(config, unet_model):
@@ -30,10 +34,16 @@ def initialize_model(config, unet_model):
     for param in perceptual_criterion.parameters():
         param.requires_grad = False
 
+    FID = FrechetInceptionDistanceModified(feature=64, reset_real_features=False, normalize=True)
+    IS = InceptionScore(feature=64, normalize=True)
+
     device = torch.device(config.device)
 
     clip_model.to(device)
     perceptual_criterion.to(device)
+
+    # FID.to(device)
+    # IS.to(device)
 
     def linear_high2low(step, start_value, final_value, start_iter, end_iter):
         return max(final_value,
@@ -92,13 +102,13 @@ def initialize_model(config, unet_model):
         #     print("Starting...")
 
         def on_train_start(self):
-            self.unet_model.to(device).train()
+            self.unet_model.to(self.device_override).train()
 
         def on_train_epoch_start(self):
-            self.unet_model.train()
+            self.unet_model.to(self.device_override).train()
 
         def on_validation_model_eval(self):
-            self.unet_model.eval()
+            self.unet_model.to(self.device_override).eval()
 
         def training_step(self, data, batch_idx):
             data_images = data['images'].to(self.device_override)
@@ -169,6 +179,14 @@ def initialize_model(config, unet_model):
             else:
                 multiply_w_clip = 0
                 multiply_w_perceptual = 0
+
+            FID.update(gt_imgs.to(torch.uint8).cpu(), real=True)
+            FID.update(pred_imgs.to(torch.uint8).cpu(), real=False)
+            IS.update(pred_imgs.to(torch.uint8).cpu())
+
+            if self.global_step > 2:
+                self.log_metric("FID", FID.compute())
+                self.log_metric("IS", IS.compute()[0])
 
             return pred_imgs, gt_imgs, pred_depth, gt_depth, loss_perceptual, pred_clip, gt_clip, multiply_w_clip, \
                 multiply_w_perceptual, torch.zeros(1, device=loss_perceptual.device), w1
@@ -251,7 +269,11 @@ def initialize_model(config, unet_model):
                 multiply_w_perceptual, loss_tv, w1
 
         def log_loss(self, name, loss):
-            self.log(f"{name}", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            self.log(f"train/{name}", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                     batch_size=self.config.training.batch_size)
+
+        def log_metric(self, metric, value):
+            self.log(f"eval/{metric}", value, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                      batch_size=self.config.training.batch_size)
 
         def configure_optimizers(self):
@@ -277,16 +299,17 @@ def initialize_model(config, unet_model):
                 depth_start = data_depth
                 input_feat = torch.cat([x_start, depth_start], dim=1)
                 _, _, _, planes = self(input_feat, return_3d_features=True, render=False)
-                create_3d_output(self, planes, output_path=config.logging.intermediate_outputs,
-                                 filename=str(self.global_step)+'-'+str(batch_idx))
+                depths = create_3d_output(self, planes, output_path=config.logging.intermediate_outputs,
+                                          filename=str(self.global_step) + '-' + str(batch_idx))
+
+                self.log_metric("NFS", compute_flatness_score(depths))
 
         def val_dataloader(self):
             datasetClass = getDataset(self.config.training.dataset)
             dataset = datasetClass(self.config.training.evaluate_folder, image_size=self.config.image_size,
-                                   config=self.config)
-            dataloader = DataLoader(dataset, batch_size=self.config.training.batch_size, drop_last=True,
+                                   config=self.config, random_flip=False)
+            dataloader = DataLoader(dataset, batch_size=self.config.training.evaluation_batch_size, drop_last=True,
                                     num_workers=8, persistent_workers=True)
             return dataloader
-
 
     return Generator3D

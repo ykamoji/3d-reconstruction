@@ -57,7 +57,7 @@ def train(config):
         enable_version_counter=True,
         save_top_k=3,
         verbose=True,
-        monitor='total_loss',
+        monitor='train/total_loss',
         every_n_epochs=1,
         mode='min',
         filename='checkpoint-{epoch:02d}-{total_loss:.5f}'
@@ -65,7 +65,7 @@ def train(config):
 
     trainer = Trainer(max_epochs=config.training.train_num_steps,
                       log_every_n_steps=1,
-                      val_check_interval=0.25,
+                      check_val_every_n_epoch=2,
                       # max_steps=2,
                       # precision="16-mixed",
                       default_root_dir=results_folder,

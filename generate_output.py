@@ -27,6 +27,7 @@ def create_3d_output(model, planes, num_frames=128, vimg_size=128, output_path='
     ray_origins, ray_directions = sample_rays(cam2w, camera_samples.fov[:, None], [vimg_size ,vimg_size])
 
     frames = []
+    depths = []
     print('Visualizing file: ', filename)
     for th in tqdm(range(num_frames)):
 
@@ -44,10 +45,12 @@ def create_3d_output(model, planes, num_frames=128, vimg_size=128, output_path='
         if bs == 1:
             depth_reshape = depth_reshape.unsqueeze(0)
         depth_reshape = depth_reshape.permute(0 ,3 ,1 ,2)[: ,:3 ] /255
-
+        depths.append(depth_reshape)
         combined = torch.cat([rgb_reshape, depth_reshape], dim=3)
         combined = make_grid(combined, nrow = int(math.sqrt(bs)))
         frame = (255 * np.clip(combined.permute(1 ,2 ,0).cpu().detach().numpy(), 0, 1)).astype(np.uint8)
         frames.append(frame)
 
     imageio.mimwrite(os.path.join(output_path, f'output-{filename}.mp4'), frames, fps=40, quality=8)
+
+    return depths
