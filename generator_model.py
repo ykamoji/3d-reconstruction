@@ -61,7 +61,7 @@ def initialize_model(config, unet_model):
 
     def loss_prepare(loss_type, loss_fn, imgs_1, imgs_2):
 
-        if loss_type == 'l1' or loss_type == 'l2':
+        if loss_type == 'l1' or loss_type == 'l2' or loss_type == 'l1_smooth':
             return loss_fn(imgs_1, imgs_2)
 
         if loss_type == 'cos':
@@ -85,13 +85,16 @@ def initialize_model(config, unet_model):
             self.device_override = device
             self.unet_model = unet_model
             self.config = config
-            self.loss_type = self.config.training.loss_type
-            if self.loss_type == 'l1':
-                self.loss_fn = F.l1_loss
-            elif self.loss_type == 'l2':
-                self.loss_fn = nn.MSELoss()
-            elif self.loss_type == 'cos':
-                self.loss_fn = nn.CosineEmbeddingLoss()
+            # self.loss_type = self.config.training.loss_type
+            # if self.loss_type == 'l1':
+            #     self.loss_fn = F.l1_loss
+            # elif self.loss_type == 'l2':
+            #     self.loss_fn = nn.MSELoss()
+            # elif self.loss_type == 'cos':
+            #     self.loss_fn = nn.CosineEmbeddingLoss()
+            self.rgb_loss_fn = F.smooth_l1_loss
+            self.depth_loss_fn = F.smooth_l1_loss
+            self.clip_loss_fn = nn.CosineEmbeddingLoss()
 
         def forward(self, x, **kwargs):
             return self.unet_model(x, **kwargs)
@@ -128,9 +131,9 @@ def initialize_model(config, unet_model):
                 multiply_w_perceptual, loss_tv, w1 = Process(input_feat, data_images, data_depth, x_start, batch_size)
 
             loss_perceptual = loss_perceptual.mean()
-            loss_rgb = loss_prepare(self.loss_type, self.loss_fn, pred_imgs, gt_imgs)
-            loss_depth = loss_prepare(self.loss_type, self.loss_fn, pred_depth, gt_depth)
-            loss_clip = loss_prepare(self.loss_type, self.loss_fn, pred_clip, gt_clip)
+            loss_rgb = loss_prepare("l1_smooth", self.rgb_loss_fn, pred_imgs, gt_imgs)
+            loss_depth = loss_prepare("l1_smooth", self.depth_loss_fn, pred_depth, gt_depth)
+            loss_clip = loss_prepare("cos", self.clip_loss_fn, pred_clip, gt_clip)
             loss_weight = (1 - w1).mean()
             multiply_weight = linear_low2high(self.global_step, 0, 1, 0, self.config.training.train_num_steps // 2)
 
