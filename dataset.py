@@ -130,6 +130,12 @@ class Custom_Dataset(Dataset):
             results['images'] = flip(results['images'])
             results['depth'] = flip(results['depth'])
 
+        # if results['images'].shape[0] < 3:
+        #     print(f"id: {results['idx']}")
+        #     print(f"{img_filename}")
+        #     print(f"img: {results['images'].shape}")
+        #     print(f"depth : {results['depth'].shape}")
+
         return results
 
 

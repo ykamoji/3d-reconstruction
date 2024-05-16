@@ -122,6 +122,12 @@ def initialize_model(config, unet_model):
             depth_start = data_depth
             input_feat = torch.cat([x_start, depth_start], dim=1)
 
+            # if input_feat.shape[1] < 4:
+            #     print(f"Issue for {data['idx']}: {input_feat.shape}")
+            #     print(f"{data_images.shape}")
+            #     print(f"{depth_start.shape}")
+            # return torch.tensor([0.0], device=self.device_override, requires_grad=True)
+
             if random() > min(0.4, 2 * self.global_step / self.config.training.train_num_steps):
                 Process = self.process_one
             else:
@@ -301,9 +307,10 @@ def initialize_model(config, unet_model):
                 x_start = (2 * data_images - 1)
                 depth_start = data_depth
                 input_feat = torch.cat([x_start, depth_start], dim=1)
+                # print(f"{data['idx']}: {input_feat.shape}")
                 _, _, _, planes = self(input_feat, return_3d_features=True, render=False)
                 depths = create_3d_output(self, planes, output_path=config.logging.intermediate_outputs,
-                                          filename=str(self.global_step) + '-' + str(batch_idx))
+                                          filename=str(self.global_step) + '-' + str(batch_idx+1))
 
                 self.log_metric("NFS", compute_flatness_score(depths))
 
