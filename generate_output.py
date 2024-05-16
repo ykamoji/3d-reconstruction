@@ -10,9 +10,6 @@ from torchvision.utils import make_grid
 from metrics import FrechetInceptionDistanceModified, compute_flatness_score
 from torchmetrics.image.inception import InceptionScore
 
-FID = FrechetInceptionDistanceModified(feature=64, reset_real_features=False, normalize=True)
-IS = InceptionScore(feature=64, normalize=True)
-
 
 def create_3d_output(model, planes, num_frames=128, vimg_size=128, output_path='results/', filename=0, gt_imgs=None):
     device = planes.device
@@ -30,6 +27,9 @@ def create_3d_output(model, planes, num_frames=128, vimg_size=128, output_path='
     cam2w = compute_cam2world_matrix(camera_samples)
 
     ray_origins, ray_directions = sample_rays(cam2w, camera_samples.fov[:, None], [vimg_size ,vimg_size])
+
+    FID = FrechetInceptionDistanceModified(feature=64, reset_real_features=False, normalize=True, )
+    IS = InceptionScore(feature=64, normalize=True)
 
     frames = []
     depths = []
