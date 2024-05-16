@@ -62,9 +62,10 @@ def render_image(config):
     model.load_state_dict(state_dict)
 
     datasetClass = getDataset(config.training.dataset)
-    dataset = datasetClass(config.visualization.image_path, image_size=config.image_size, config=config)
-    dataloader = DataLoader(dataset, batch_size=config.training.batch_size, shuffle=True, drop_last=True,
-                            num_workers=8, persistent_workers=True)
+    dataset = datasetClass(config.visualization.image_path, image_size=config.image_size, config=config,
+                           random_flip=False)
+    dataloader = DataLoader(dataset, batch_size=config.training.evaluation_batch_size, num_workers=8,
+                            persistent_workers=True)
 
     model.eval()
     step=0
@@ -76,7 +77,7 @@ def render_image(config):
             depth_start = data['depth']
             input_feat = torch.cat([x_start, depth_start], dim=1).to(device)
             _, _, _, planes = model(input_feat, return_3d_features=True, render=False)
-            create_3d_output(model, planes, output_path=config.logging.save_dir, filename=step)
+            create_3d_output(model, planes, output_path=config.logging.save_dir, filename=step, gt_imgs=x_start)
 
 
 if __name__ == "__main__":

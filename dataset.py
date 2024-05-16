@@ -80,7 +80,7 @@ class Imagenet_Dataset(Dataset):
 
 
 class Custom_Dataset(Dataset):
-    def __init__(self, folder, image_size,  config=None):
+    def __init__(self, folder, image_size,  config=None, random_flip=True):
         super(Imagenet_Dataset).__init__()
         image_names_jpg = glob.glob(folder + "/*/*.jpg")
         image_names_png = glob.glob(folder + "/*/*.png")
@@ -96,6 +96,7 @@ class Custom_Dataset(Dataset):
         ])
 
         self.config = config
+        self.random_flip = random_flip
 
     def __len__(self):
         return len(self.image_names)
@@ -124,12 +125,19 @@ class Custom_Dataset(Dataset):
 
         results['depth'] = results['depth'] / 65536 * 2.0 + 4
 
-        if self.config.randomFLip and random.random() < 0.5:
+        if self.random_flip and random.random() < 0.5:
             results['idx'] = idx + len(self.image_names)
             results['images'] = flip(results['images'])
             results['depth'] = flip(results['depth'])
 
+        # if results['images'].shape[0] < 3:
+        #     print(f"id: {results['idx']}")
+        #     print(f"{img_filename}")
+        #     print(f"img: {results['images'].shape}")
+        #     print(f"depth : {results['depth'].shape}")
+
         return results
+
 
 def getDataset(name):
     if name == 'Imagenet':

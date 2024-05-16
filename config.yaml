@@ -6,13 +6,14 @@ device: cpu # Use cpu, cuda or mps
 randomFLip: False
 training:
   learning_rate: 5e-5
-  batch_size: 1
-  dataset: Imagenet # Custom or Imagenet
+  batch_size: 10
+  dataset: Custom # Custom or Imagenet
   train_num_steps: 5
   dataset_folder: !ENV ${DATASET_PATH}
   save_intermediate_images_step: 50
   loss_type: l1 # l1 or l2 or cos
   evaluate_folder: eval
+  evaluation_batch_size: 4
 
 rendering:
   render: True
@@ -28,8 +29,8 @@ rendering:
       ray_end: auto
       box_warp: 2
       density_noise: 0
-      depth_resolution: 32   # use 64 for visualizing (less flickering)
-      depth_resolution_importance: 32  # use 64 for visualizing (less flickering)
+      depth_resolution: 64   # use 64 for visualizing (less flickering)
+      depth_resolution_importance: 64  # use 64 for visualizing (less flickering)
       disparity_space_sampling: False
       clamp_mode: softplus
       white_back: False

@@ -16,6 +16,10 @@ from torch.utils.data import DataLoader
 from dataset import getDataset, get_camera_rays
 from torchvision.transforms import Normalize
 from torchvision import utils
+from metrics import FrechetInceptionDistanceModified, compute_flatness_score
+from torchmetrics.image.inception import InceptionScore
+
+_ = torch.manual_seed(123)
 
 
 def initialize_model(config, unet_model):
@@ -30,10 +34,16 @@ def initialize_model(config, unet_model):
     for param in perceptual_criterion.parameters():
         param.requires_grad = False
 
+    FID = FrechetInceptionDistanceModified(feature=64, reset_real_features=False, normalize=True)
+    IS = InceptionScore(feature=64, normalize=True)
+
     device = torch.device(config.device)
 
     clip_model.to(device)
     perceptual_criterion.to(device)
+
+    # FID.to(device)
+    # IS.to(device)
 
     def linear_high2low(step, start_value, final_value, start_iter, end_iter):
         return max(final_value,
@@ -51,7 +61,7 @@ def initialize_model(config, unet_model):
 
     def loss_prepare(loss_type, loss_fn, imgs_1, imgs_2):
 
-        if loss_type == 'l1' or loss_type == 'l2':
+        if loss_type == 'l1' or loss_type == 'l2' or loss_type == 'l1_smooth':
             return loss_fn(imgs_1, imgs_2)
 
         if loss_type == 'cos':
@@ -75,13 +85,16 @@ def initialize_model(config, unet_model):
             self.device_override = device
             self.unet_model = unet_model
             self.config = config
-            self.loss_type = self.config.training.loss_type
-            if self.loss_type == 'l1':
-                self.loss_fn = F.l1_loss
-            elif self.loss_type == 'l2':
-                self.loss_fn = nn.MSELoss()
-            elif self.loss_type == 'cos':
-                self.loss_fn = nn.CosineEmbeddingLoss()
+            # self.loss_type = self.config.training.loss_type
+            # if self.loss_type == 'l1':
+            #     self.loss_fn = F.l1_loss
+            # elif self.loss_type == 'l2':
+            #     self.loss_fn = nn.MSELoss()
+            # elif self.loss_type == 'cos':
+            #     self.loss_fn = nn.CosineEmbeddingLoss()
+            self.rgb_loss_fn = F.smooth_l1_loss
+            self.depth_loss_fn = F.smooth_l1_loss
+            self.clip_loss_fn = nn.CosineEmbeddingLoss()
 
         def forward(self, x, **kwargs):
             return self.unet_model(x, **kwargs)
@@ -92,13 +105,13 @@ def initialize_model(config, unet_model):
         #     print("Starting...")
 
         def on_train_start(self):
-            self.unet_model.to(device).train()
+            self.unet_model.to(self.device_override).train()
 
         def on_train_epoch_start(self):
-            self.unet_model.train()
+            self.unet_model.to(self.device_override).train()
 
         def on_validation_model_eval(self):
-            self.unet_model.eval()
+            self.unet_model.to(self.device_override).eval()
 
         def training_step(self, data, batch_idx):
             data_images = data['images'].to(self.device_override)
@@ -109,6 +122,12 @@ def initialize_model(config, unet_model):
             depth_start = data_depth
             input_feat = torch.cat([x_start, depth_start], dim=1)
 
+            # if input_feat.shape[1] < 4:
+            #     print(f"Issue for {data['idx']}: {input_feat.shape}")
+            #     print(f"{data_images.shape}")
+            #     print(f"{depth_start.shape}")
+            # return torch.tensor([0.0], device=self.device_override, requires_grad=True)
+
             if random() > min(0.4, 2 * self.global_step / self.config.training.train_num_steps):
                 Process = self.process_one
             else:
@@ -118,9 +137,9 @@ def initialize_model(config, unet_model):
                 multiply_w_perceptual, loss_tv, w1 = Process(input_feat, data_images, data_depth, x_start, batch_size)
 
             loss_perceptual = loss_perceptual.mean()
-            loss_rgb = loss_prepare(self.loss_type, self.loss_fn, pred_imgs, gt_imgs)
-            loss_depth = loss_prepare(self.loss_type, self.loss_fn, pred_depth, gt_depth)
-            loss_clip = loss_prepare(self.loss_type, self.loss_fn, pred_clip, gt_clip)
+            loss_rgb = loss_prepare("l1_smooth", self.rgb_loss_fn, pred_imgs, gt_imgs)
+            loss_depth = loss_prepare("l1_smooth", self.depth_loss_fn, pred_depth, gt_depth)
+            loss_clip = loss_prepare("cos", self.clip_loss_fn, pred_clip, gt_clip)
             loss_weight = (1 - w1).mean()
             multiply_weight = linear_low2high(self.global_step, 0, 1, 0, self.config.training.train_num_steps // 2)
 
@@ -169,6 +188,14 @@ def initialize_model(config, unet_model):
             else:
                 multiply_w_clip = 0
                 multiply_w_perceptual = 0
+
+            FID.update(gt_imgs.to(torch.uint8).cpu(), real=True)
+            FID.update(pred_imgs.to(torch.uint8).cpu(), real=False)
+            IS.update(pred_imgs.to(torch.uint8).cpu())
+
+            if self.global_step > 2:
+                self.log_metric("FID", FID.compute())
+                self.log_metric("IS", IS.compute()[0])
 
             return pred_imgs, gt_imgs, pred_depth, gt_depth, loss_perceptual, pred_clip, gt_clip, multiply_w_clip, \
                 multiply_w_perceptual, torch.zeros(1, device=loss_perceptual.device), w1
@@ -251,7 +278,11 @@ def initialize_model(config, unet_model):
                 multiply_w_perceptual, loss_tv, w1
 
         def log_loss(self, name, loss):
-            self.log(f"{name}", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+            self.log(f"train/{name}", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True,
+                     batch_size=self.config.training.batch_size)
+
+        def log_metric(self, metric, value):
+            self.log(f"eval/{metric}", value, on_step=False, on_epoch=True, prog_bar=True, logger=True,
                      batch_size=self.config.training.batch_size)
 
         def configure_optimizers(self):
@@ -276,17 +307,19 @@ def initialize_model(config, unet_model):
                 x_start = (2 * data_images - 1)
                 depth_start = data_depth
                 input_feat = torch.cat([x_start, depth_start], dim=1)
+                # print(f"{data['idx']}: {input_feat.shape}")
                 _, _, _, planes = self(input_feat, return_3d_features=True, render=False)
-                create_3d_output(self, planes, output_path=config.logging.intermediate_outputs,
-                                 filename=str(self.global_step)+'-'+str(batch_idx))
+                depths = create_3d_output(self, planes, output_path=config.logging.intermediate_outputs,
+                                          filename=str(self.global_step) + '-' + str(batch_idx+1))
+
+                self.log_metric("NFS", compute_flatness_score(depths))
 
         def val_dataloader(self):
             datasetClass = getDataset(self.config.training.dataset)
             dataset = datasetClass(self.config.training.evaluate_folder, image_size=self.config.image_size,
-                                   config=self.config)
-            dataloader = DataLoader(dataset, batch_size=self.config.training.batch_size, drop_last=True,
+                                   config=self.config, random_flip=False)
+            dataloader = DataLoader(dataset, batch_size=self.config.training.evaluation_batch_size, drop_last=True,
                                     num_workers=8, persistent_workers=True)
             return dataloader
-
 
     return Generator3D
