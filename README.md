@@ -53,8 +53,8 @@ In config.yaml,<br>
 
 ### Pre trained model
 
-Pretrained f_trigen on imagenet can be found here: https://drive.google.com/file/d/1Bg5k3IYquph-cZbWJVW0A4kyyd-t7n-d/view
-
+Pretrained, fine-tuned and optimized can be found here:
+https://drive.google.com/drive/folders/1Q8DHDj4rQxuuR2A4scv5xRPf1nnNQ-eb?usp=sharing
 To train, run the below command
 
 ```bash 

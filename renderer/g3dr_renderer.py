@@ -6,7 +6,7 @@ from eg3d.renderer import ImportanceRenderer, sample_from_planes, sample_from_3d
 
 GRAD_CLIP_MIN = 0.05
 STYLE = 'lod_no'
-
+switch = False
 
 class GradientScaler(torch.autograd.Function):
     @staticmethod
@@ -109,10 +109,16 @@ class ImportanceRenderer_extended(ImportanceRenderer):
                     bs = importance_depth.shape[0]
                     importance_depth_reshape = importance_depth.permute(0, 2, 3, 1).reshape(bs, -1, 1)
                     importance_depth_reshape = importance_depth_reshape[:, :, None, :]
-                    if random() > 0.6:
-                        var = 0.05
-                        sample_uniform = torch.linspace(-var, var, N_importance).to(planes.device)
-                        depths_fine = importance_depth_reshape + sample_uniform[None, None, :, None]
+
+                    if switch:
+                        if random() > 0.6:
+                            var = 0.05
+                            sample_uniform = torch.linspace(-var, var, N_importance).to(planes.device)
+                            depths_fine = importance_depth_reshape + sample_uniform[None, None, :, None]
+                    else:
+                        importance_depth = importance_depth.sort(1, stable=True)
+                        depths_fine = importance_depth_reshape
+
                 if depths_fine is None:
                     _, _, weights, weight_total = self.ray_marcher(colors_coarse, densities_coarse, depths_coarse,
                                                                    rendering_options)
